@@ -119,6 +119,7 @@ func processMultiKeyNoData(first_line string, remainder []byte) (keys []string, 
 
 var CMD_PROCESSORS = map[string]func(first_line string, remainder []byte) (keys []string, processed_remainder []byte, cmd_err int){
 	"get":     processSingleKeyNoData,
+	"delete":  processSingleKeyNoData,
 	"gets":    processMultiKeyNoData,
 	"set":     processSingleKeyWithData,
 	"add":     processSingleKeyWithData,
@@ -149,6 +150,7 @@ func parseCommand(app_data []byte) (cmd string, keys []string, remainder []byte,
 	first_line := string(app_data[:newline_i])
 	split_data := strings.Split(first_line, " ")
 	cmd = split_data[0]
+	//log.Println(cmd)
 	if fn, ok := CMD_PROCESSORS[cmd]; ok {
 		keys, remainder, cmd_err = fn(first_line, app_data[newline_i+2:])
 	} else {

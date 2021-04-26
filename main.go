@@ -4,10 +4,11 @@ import (
 	"container/heap"
 	"flag"
 	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/pcap"
 	"io/ioutil"
 	"time"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/pcap"
 )
 
 const CAPTURE_SIZE = 9000
@@ -40,7 +41,7 @@ func startReportingLoop(config Config, hot_keys *HotKeyPool, errors *HotKeyPool)
 			}
 
 			key := heap.Pop(top_keys)
-			output += fmt.Sprintf("mcsauna.keys.%s %d\n", key.(*Key).Name, key.(*Key).Hits)
+			output += fmt.Sprintf("mcsauna.keys.%s %s %d\n", key.(*Key).Name, key.(*Key).Command, key.(*Key).Hits)
 
 			i += 1
 		}
@@ -147,6 +148,7 @@ func main() {
 
 	// Grab a packet
 	var (
+		cmd     string
 		payload []byte
 		keys    []string
 		cmd_err int
@@ -159,25 +161,32 @@ func main() {
 		payload = app_data.Payload()
 
 		// Process data
-		prev_payload_len := 0
+		//prev_payload_len := 0
 		for len(payload) > 0 {
-			_, keys, payload, cmd_err = parseCommand(payload)
+			cmd, keys, payload, cmd_err = parseCommand(payload)
 
 			// ... We keep track of the payload length to make sure we don't end
 			// ... up in an infinite loop if one of the processors repeatedly
 			// ... sends us the same remainder.  This should never happen, but
 			// ... if it does, it would be better to move on to the next packet
 			// ... rather than spin CPU doing nothing.
-			if len(payload) == prev_payload_len {
-				break
-			}
-			prev_payload_len = len(payload)
+			//if len(payload) == prev_payload_len {
+			//	break
+			//}
+			//prev_payload_len = len(payload)
 
 			if cmd_err == ERR_NONE {
 
 				// Raw key
 				if len(config.Regexps) == 0 {
-					hot_keys.Add(keys)
+					keysItems := make([]HotKeyPoolItem, 0)
+					for _, key := range keys {
+						keysItems = append(keysItems, HotKeyPoolItem{
+							Name:    key,
+							Command: cmd,
+						})
+					}
+					hot_keys.Add(keysItems)
 				} else {
 
 					// Regex
@@ -198,11 +207,30 @@ func main() {
 							matches = append(matches, matched_regex)
 						}
 					}
-					hot_keys.Add(matches)
-					errors.Add(match_errors)
+					matchesItems := make([]HotKeyPoolItem, 0)
+					for _, match := range matches {
+						matchesItems = append(matchesItems, HotKeyPoolItem{
+							Name:    match,
+							Command: cmd,
+						})
+					}
+					hot_keys.Add(matchesItems)
+					matchesErrorsItems := make([]HotKeyPoolItem, 0)
+					for _, match := range match_errors {
+						matchesItems = append(matchesItems, HotKeyPoolItem{
+							Name:    match,
+							Command: cmd,
+						})
+					}
+					errors.Add(matchesErrorsItems)
 				}
 			} else {
-				errors.Add([]string{ERR_TO_STAT[cmd_err]})
+				errors.Add([]HotKeyPoolItem{
+					HotKeyPoolItem{
+						Name:    ERR_TO_STAT[cmd_err],
+						Command: "",
+					},
+				})
 			}
 		}
 	}

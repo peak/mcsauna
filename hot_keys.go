@@ -6,8 +6,9 @@ import (
 )
 
 type Key struct {
-	Name string
-	Hits int
+	Name    string
+	Command string
+	Hits    int
 }
 
 // KeyHeap keeps track of hot keys and pops them off ordered by hotness,
@@ -34,22 +35,26 @@ func (h *KeyHeap) Pop() interface{} {
 	return x
 }
 
+type HotKeyPoolItem struct {
+	Name    string
+	Command string
+}
 type HotKeyPool struct {
 	Lock sync.Mutex
 
 	// Map of keys to hits
-	items map[string]int
+	items map[HotKeyPoolItem]int
 }
 
 func NewHotKeyPool() *HotKeyPool {
 	h := &HotKeyPool{}
-	h.items = make(map[string]int)
+	h.items = make(map[HotKeyPoolItem]int)
 	return h
 }
 
 // Add adds a new key to the hit counter or increments the key's hit counter
 // if it is already present.
-func (h *HotKeyPool) Add(keys []string) {
+func (h *HotKeyPool) Add(keys []HotKeyPoolItem) {
 	h.Lock.Lock()
 	defer h.Lock.Unlock()
 
@@ -73,12 +78,12 @@ func (h *HotKeyPool) GetTopKeys() *KeyHeap {
 	heap.Init(top_keys)
 
 	for key, hits := range h.items {
-		heap.Push(top_keys, &Key{key, hits})
+		heap.Push(top_keys, &Key{key.Name, key.Command, hits})
 	}
 	return top_keys
 }
 
-func (h *HotKeyPool) GetHits(key string) int {
+func (h *HotKeyPool) GetHits(key HotKeyPoolItem) int {
 	h.Lock.Lock()
 	defer h.Lock.Unlock()
 	return h.items[key]
@@ -96,6 +101,6 @@ func (h *HotKeyPool) Rotate() *HotKeyPool {
 	new_hot_key_pool.items = h.items
 
 	// Clear existing values
-	h.items = make(map[string]int)
+	h.items = make(map[HotKeyPoolItem]int)
 	return new_hot_key_pool
 }
